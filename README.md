@@ -1,134 +1,113 @@
-## Dataset README
+### README: Chekishni Bashoratlash Loyihasi (Smoking Prediction Project)  
 
-## Dataset haqida
-Bu dataset **dehqonchilik va hosil samaradorligi**ni tahlil qilish uchun yaratilgan. Ushbu ma'lumotlar turli xil omillar, jumladan, iqlim sharoitlari va changlatish omillari asosida hosil (yield) miqdorini bashorat qilish uchun ishlatilishi mumkin.
+Ushbu loyiha tibbiy va demografik ma'lumotlardan foydalanib, chekish odatlarini bashorat qilishga qaratilgan. Quyida loyihaning jarayoni, ishlatilgan metodlar va optimizatsiya hamda baholash usullari haqida batafsil ma'lumot berilgan.  
 
-## Eng yaxshi MAE = 244
+---
 
-## Ma'lumot ustunlari
-Dataset quyidagi ustunlardan iborat:
+### **Dataset haqida (Dataset Overview)**  
+Datasetda quyidagi ustunlar mavjud:  
+- **id**: Har bir inson uchun noyob identifikator (Unique identifier for each individual)  
+- **age**: Yosh, yillarda (Age in years)  
+- **height(cm)**: Bo‘yi, santimetrda (Height in centimeters)  
+- **weight(kg)**: Vazni, kilogrammda (Weight in kilograms)  
+- **waist(cm)**: Bel atrofi, santimetrda (Waist circumference in centimeters)  
+- **eyesight(left/right)**: Chap va o‘ng ko‘zning ko‘rish qobiliyati (Vision capability for the left and right eyes)  
+- **hearing(left/right)**: Chap va o‘ng quloqning eshitish qobiliyati (Hearing capability for the left and right ears)  
+- **systolic/relaxation**: Qon bosimi ko‘rsatkichlari (Blood pressure readings)  
+- **fasting blood sugar**: Qondagi shakar miqdori (mg/dL) (Blood sugar levels (mg/dL))  
+- **Cholesterol, triglyceride, HDL, LDL**: Qon lipid profili ko‘rsatkichlari (Lipid profile parameters)  
+- **hemoglobin**: Qondagi gemoglobin darajasi (Hemoglobin levels in the blood)  
+- **Urine protein**: Siydikdagi oqsil miqdori (Protein levels in urine)  
+- **serum creatinine**: Qondagi kreatinin darajasi (Creatinine levels in the blood)  
+- **AST, ALT, GTP**: Jigar fermentlari ko‘rsatkichlari (Liver enzyme readings)  
+- **dental caries**: Tish holati indikatori (Dental condition indicator)  
+- **smoking**: Maqsadli ustun: chekish odati (1 = chekadi, 0 = chekmaydi) (Target variable: 1 = smoker, 0 = non-smoker)  
 
-### 1. **id**
-   - **Turi**: Categorical
-   - **Tavsifi**: Har bir qator uchun unikal identifikator.
+---
 
-### 2. **Row#**
-   - **Turi**: Integer
-   - **Tavsifi**: Qatorning tartib raqami.
+### **Ishlatilgan vositalar va kutubxonalar (Tools and Libraries)**  
+- **Python**: Dasturlash tili (Programming language for implementation)  
+- **Pandas & NumPy**: Ma’lumotlarni qayta ishlash va matematik hisoblar uchun (Data manipulation and numerical computations)  
+- **Scikit-learn**: Mashinani o‘rganish modellarini yaratish, metrikalar va kross-validatsiya (Machine learning models, metrics, and cross-validation)  
+- **Optuna**: Gipermetrlarni optimallashtirish kutubxonasi (Hyperparameter tuning library)  
 
-### 3. **clonesize**
-   - **Turi**: Numeric
-   - **Tavsifi**: O'simlikning klonlash darajasini o'lchaydigan qiymat.
+---
 
-### 4. **honeybee**
-   - **Turi**: Numeric
-   - **Tavsifi**: Asalarilar soni (honeybee) va ularning changlatishda qatnashish darajasi.
+### **Loyiha jarayoni (Project Workflow)**  
 
-### 5. **bumbles**
-   - **Turi**: Numeric
-   - **Tavsifi**: Yovvoyi asalarilar (bumbles) soni va ularning changlatishda ishtiroki.
+#### 1. **Ma'lumotlarni ajratish (Data Splitting)**  
+Ma'lumotlar `train_test_split` orqali o‘quv (train) va test to‘plamlariga bo‘lindi.  
+```python
+X = df.drop('smoking', axis=1)
+y = df['smoking']
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+```
 
-### 6. **andrena**
-   - **Turi**: Numeric
-   - **Tavsifi**: Andrena turidagi changlatuvchi asalarilar soni.
+#### 2. **Optuna yordamida gipermetrlarni sozlash (Hyperparameter Tuning with Optuna)**  
+RandomForest modelining gipermetrlari (masalan, `n_estimators`, `max_depth`) Optuna yordamida optimallashtirildi.  
+```python
+def objective(trial):
+    n_estimators = trial.suggest_int('n_estimators', 50, 300)
+    max_depth = trial.suggest_int('max_depth', 5, 30)
+    ...
+    rf_model = RandomForestClassifier(
+        n_estimators=n_estimators, max_depth=max_depth, random_state=42
+    )
+    score = cross_val_score(rf_model, X_train, y_train, cv=5, scoring='roc_auc').mean()
+    return score
+```
 
-### 7. **osmia**
-   - **Turi**: Numeric
-   - **Tavsifi**: Osmia turidagi changlatuvchi asalarilar soni.
+#### 3. **Eng yaxshi parametrlar bilan modelni o‘rgatish (Model Training with Best Parameters)**  
+Optuna topgan eng yaxshi parametrlar asosida RandomForestClassifier va DecisionTreeClassifier yaratildi. Ushbu modellar `VotingClassifier` yordamida birlashtirildi.  
+```python
+rf_model = RandomForestClassifier(**best_params, random_state=42)
+voting_clf = VotingClassifier(
+    estimators=[('rf', rf_model), ('dt', dt_model)],
+    voting='soft'
+)
+voting_clf.fit(X_train, y_train)
+```
 
-### 8. **MaxOfUpperTRange**
-   - **Turi**: Numeric
-   - **Tavsifi**: Haroratning yuqori chegarasi.
+#### 4. **Modellarni baholash (Model Evaluation)**  
+ROC AUC va o‘quv egri chiziqlari yordamida modellar baholandi.  
+```python
+auc_score = roc_auc_score(y_test, y_prob)
+fpr, tpr, thresholds = roc_curve(y_test, y_prob)
+plt.plot(fpr, tpr, label=f'ROC Curve (AUC = {auc_score:.2f})')
+```
 
-### 9. **MinOfUpperTRange**
-   - **Turi**: Numeric
-   - **Tavsifi**: Yuqori harorat oralig'ining minimal qiymati.
+#### 5. **Kalibratsiya va Brier Score (Calibration and Brier Score)**  
+Random Forest modeli `CalibratedClassifierCV` yordamida kalibrlashdan o‘tkazildi va Brier Score kamaygani kuzatildi.  
+```python
+calibrated_rf = CalibratedClassifierCV(estimator=rf_model, method='sigmoid', cv=5)
+calibrated_rf.fit(X_train, y_train)
+brier_calibrated = brier_score_loss(y_test, y_prob_calibrated)
+```
 
-### 10. **AverageOfUpperTRange**
-   - **Turi**: Numeric
-   - **Tavsifi**: Yuqori harorat oralig'ining o'rtacha qiymati.
+---
 
-### 11. **MaxOfLowerTRange**
-   - **Turi**: Numeric
-   - **Tavsifi**: Past harorat oralig'ining maksimal qiymati.
+### **Natijalar (Results)**  
+- **Gipermetr optimallashtirish (Hyperparameter Optimization)**: Optuna yordamida modelning eng yaxshi parametrlar aniqlandi.  
+- **Model baholash (Model Evaluation)**: VotingClassifier modelining ROC AUC balli yuqori ekanligi aniqlangan.  
+- **Kalibratsiya natijalari (Calibration Results)**: Kalibrlangan model aniqroq bashoratlar berdi (past Brier Score).  
 
-### 12. **MinOfLowerTRange**
-   - **Turi**: Numeric
-   - **Tavsifi**: Past harorat oralig'ining minimal qiymati.
+---
 
-### 13. **AverageOfLowerTRange**
-   - **Turi**: Numeric
-   - **Tavsifi**: Past harorat oralig'ining o'rtacha qiymati.
+### **Fayl tuzilmasi (File Structure)**  
+- `dataset.csv`: Ma'lumotlar fayli (Dataset file)  
+- `model_training.py`: Modelni o‘rgatish va baholash kodlari (Model training and evaluation script)  
+- `README.md`: Loyihani tushuntirish fayli (This file)  
 
-### 14. **RainingDays**
-   - **Turi**: Numeric
-   - **Tavsifi**: Yomg'irli kunlarning soni.
+---
 
-### 15. **AverageRainingDays**
-   - **Turi**: Numeric
-   - **Tavsifi**: Yomg'irli kunlarning o'rtacha soni.
+### **Natijaviy fayl (Final Output File)**  
+Tugallangan model bashoratlari CSV faylga yozib chiqildi:  
+```python
+subm = pd.read_csv("sample_submission.csv")
+subm['smoking'] = y_test_prob
+subm.to_csv("final_submission.csv", index=False)
+```  
 
-### 16. **fruitset**
-   - **Turi**: Numeric
-   - **Tavsifi**: Hosil miqdori shakllanish darajasi.
+---
 
-### 17. **fruitmass**
-   - **Turi**: Numeric
-   - **Tavsifi**: Meva massasining o'rtacha qiymati.
-
-### 18. **seeds**
-   - **Turi**: Numeric
-   - **Tavsifi**: O'simlik urug'lari soni.
-
-### 19. **yield**
-   - **Turi**: Numeric (Target)
-   - **Tavsifi**: Olingan hosil miqdori (target ustun).
-
-## Feature Engineering
-Datasetda quyidagi yangi ustunlar feature engineering orqali qo'shildi:
-
-### 1. Yuqori va past haroratlar farqlari:
-   - `UpperTempRange`: Yuqori haroratlarning maksimal va minimal qiymatlari orasidagi farqni hisoblaydi.
-   - `LowerTempRange`: Past haroratlarning maksimal va minimal qiymatlari orasidagi farqni hisoblaydi.
-
-### 2. Haroratning o'rtacha farqi:
-   - `AvgTempDifference`: O'rtacha yuqori harorat va o'rtacha past harorat orasidagi farqni aks ettiradi.
-
-### 3. Changlatuvchilar faoliyati bo'yicha indeks:
-   - `PollinatorActivity`: Asalari, bumblebee, andrena va osmia kabi changlatuvchilar faoliyatini jamlab indeks hosil qiladi.
-
-### 4. Changlatuvchi turlar nisbati:
-   - `HoneybeeToBumblesRatio`: Honeybee va bumbles o'rtasidagi nisbat.
-   - `HoneybeeToAndrenaRatio`: Honeybee va andrena o'rtasidagi nisbat.
-   - `HoneybeeToOsmiaRatio`: Honeybee va osmia o'rtasidagi nisbat.
-
-### 5. Yomg'ir kunlari soni:
-   - `TotalRainyDays`: Yomg'irli kunlarning umumiy sonini hisoblaydi (`RainingDays` va `AverageRainingDays` mahsuloti).
-
-### 6. Yomg'ir intensivligi:
-   - `RainIntensity`: Yomg'irning intensivligini ko'rsatadi (`AverageRainingDays` ni `RainingDays` ga bo'lish orqali hisoblanadi).
-
-### 7. Urug' zichligi:
-   - `SeedDensity`: Har bir meva massasiga to'g'ri keladigan urug'lar soni (`seeds`ni `fruitmass`ga bo'lish orqali aniqlanadi).
-
-## Modellar
-Bu dataset quyidagi regressiya modellarini sinab ko'rish uchun ishlatilgan:
-
-1. **Chiziqli Modellar:**
-   - Linear Regression
-   - Ridge Regression
-   - Lasso Regression
-   - ElasticNet Regression
-
-2. **Ansambl Modellar:**
-   - Random Forest Regressor
-   - Gradient Boosting Regressor
-   - XGBoost
-   - LightGBM
-
-### Ansambl Modellarni Optimizatsiya
-Ansambl modellarni yanada samarali ishlashi uchun **Optuna** yordamida hiperparametrlarni tuning qilindi. Ushbu optimizatsiya algoritmi modellarning giperparametrlarini aniqlashda samaradorlikni oshirishga yordam beradi va yuqori aniqlikdagi bashoratlarni ta'minlaydi.
-
-## Foydalanish
-Yuqoridagi ustunlar va yangi yaratilgan xususiyatlar hosildorlikni yanada aniqroq bashorat qilishga yordam beradi. Ushbu dataset turli xil regression algoritmlar, shuningdek, ansambl modellari bilan tahlil qilish uchun ishlatilishi mumkin.
-"""
+Loyiha haqida savollaringiz bo‘lsa, [abdulboriyesonov339@gmail.com] orqali murojaat qilishingiz mumkin.  
